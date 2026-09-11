@@ -7,3 +7,11 @@ export const registerSchema = Joi.object({
   role: Joi.string().valid('EMPLOYEE', 'IT_STAFF').optional(),  
   department: Joi.string().trim().min(2).max(100).required(),
 });
+export const updateProfileSchema = Joi.object({
+  fullName: Joi.string().trim().min(3).max(100).required(),
+});
+
+export const updatePasswordSchema = Joi.object({
+  oldPassword: Joi.string().required(),
+  newPassword: Joi.string().min(6).required(),
+});

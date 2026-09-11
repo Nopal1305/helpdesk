@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import server from './server/server.js';
 
 const host = process.env.DB_HOST;

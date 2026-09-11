@@ -18,6 +18,18 @@ export const CATEGORY = {
   OTHER:    { label: 'Other' },
 };
 
+export const DEPARTMENTS = [
+  "COMDEV",
+  "IT & COMMUNICATION",
+  "HSE",
+  "PRODUCTION",
+  "MAINTENANCE",
+  "SCM",
+  "HR & ADMIN",
+  "CLINIC",
+  "SECURITY"
+];
+
 export const TICKET_FILTERS = ['Open', 'In Progress', 'Resolved'];
 
 export const getUserName = (user) => 
