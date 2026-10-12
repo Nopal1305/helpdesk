@@ -9,9 +9,14 @@ export const createTicketSchema = Joi.object({
 });
 
 export const updateStatusSchema = Joi.object({
-  status: Joi.string().valid('OPEN', 'IN_PROGRESS', 'RESOLVED').required(),
+  status: Joi.string().valid('OPEN', 'IN_PROGRESS', 'RESOLVED', 'PENDING', 'REJECTED').required(),
   resolution_notes: Joi.string().allow('', null).optional(),
-  resolution_image: Joi.string().allow('', null).optional()
+  resolution_image: Joi.string().allow('', null).optional(),
+  action_reason: Joi.string().allow('', null).when('status', {
+    is: Joi.valid('PENDING', 'REJECTED'),
+    then: Joi.required(),
+    otherwise: Joi.optional()
+  })
 });
 
 export const feedbackSchema = Joi.object({
@@ -26,4 +31,9 @@ export const feedbackSchema = Joi.object({
     then: Joi.required(),
     otherwise: Joi.optional()
   })
+});
+
+// Pembatalan tiket oleh Pelapor (Status: CANCELLED) - alasan wajib diisi, mis. "Kendala hilang"
+export const cancelTicketSchema = Joi.object({
+  cancel_reason: Joi.string().trim().min(3).max(500).required()
 });

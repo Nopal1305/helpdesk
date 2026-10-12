@@ -76,20 +76,21 @@ export const ticketApi = {
     return data;
   },
 
-  async updateStatus(ticketId, status, resolutionNote, resolutionImage) {
-    console.log('API updateStatus called:', { ticketId, status, resolutionNote, resolutionImage: resolutionImage ? 'IMAGE_PROVIDED' : 'NO_IMAGE' });
-    const { data } = await api.patch(`/ticket/${ticketId}`, { status, resolution_notes: resolutionNote, resolution_image: resolutionImage });
+  async updateStatus(ticketId, status, resolutionNote, resolutionImage, actionReason = null) {
+    console.log('API updateStatus called:', { ticketId, status, resolutionNote, resolutionImage: resolutionImage ? 'IMAGE_PROVIDED' : 'NO_IMAGE', actionReason });
+    const { data } = await api.patch(`/ticket/${ticketId}`, { status, resolution_notes: resolutionNote, resolution_image: resolutionImage, action_reason: actionReason });
     console.log('API updateStatus response:', data);
     return data;
   },
 
-  async assign(ticketId, assignee_id, assignment_note) {
-    const { data } = await api.patch(`/ticket/${ticketId}/assign`, { assignee_id, assignment_note });
+  async assign(ticketId, assignee_id, assignment_note_user, assignment_note_tech) {
+    console.log('ticketApi.assign called with:', { ticketId, assignee_id, assignment_note_user, assignment_note_tech });
+    const { data } = await api.patch(`/ticket/${ticketId}/assign`, { assignee_id, assignment_note_user, assignment_note_tech });
     return data;
   },
 
-  async claim(ticketId, assignment_note) {
-    const { data } = await api.patch(`/ticket/${ticketId}/claim`, { assignment_note });
+  async claim(ticketId, assignment_note_user) {
+    const { data } = await api.patch(`/ticket/${ticketId}/claim`, { assignment_note_user });
     return data;
   },
 
@@ -100,6 +101,11 @@ export const ticketApi = {
 
   async submitFeedback(ticketId, payload) {
     const { data } = await api.patch(`/ticket/${ticketId}/confirm`, payload);
+    return data;
+  },
+
+  async cancel(ticketId, cancelReason) {
+    const { data } = await api.patch(`/ticket/${ticketId}/cancel`, { cancel_reason: cancelReason });
     return data;
   },
 };

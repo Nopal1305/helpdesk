@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 
@@ -38,6 +37,7 @@ export default function ReportsView({ tickets }) {
       open: filteredTickets.filter(t => t.status === 'OPEN').length,
       inProgress: filteredTickets.filter(t => t.status === 'IN_PROGRESS').length,
       resolved: filteredTickets.filter(t => t.status === 'RESOLVED').length,
+      cancelled: filteredTickets.filter(t => t.status === 'CANCELLED').length,
     };
   }, [filteredTickets]);
 
@@ -51,7 +51,7 @@ export default function ReportsView({ tickets }) {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Tickets');
 
-    const headers = ['Ticket ID', 'Title', 'Category', 'Department', 'Reporter', 'Assignee', 'Priority', 'Status', 'Created At', 'Resolved At'];
+    const headers = ['Ticket ID', 'Title', 'Category', 'Department', 'Reporter', 'Assignee', 'Priority', 'Status', 'Created At', 'Resolved At', 'Cancelled At'];
     worksheet.addRow(headers);
 
     // Style headers
@@ -83,7 +83,8 @@ export default function ReportsView({ tickets }) {
         t.priority,
         t.status,
         t.createdAt ? new Date(t.createdAt).toLocaleString('en-US') : '-',
-        t.resolvedAt ? new Date(t.resolvedAt).toLocaleString('en-US') : '-'
+        t.resolvedAt ? new Date(t.resolvedAt).toLocaleString('en-US') : '-',
+        t.cancelledAt ? new Date(t.cancelledAt).toLocaleString('en-US') : '-'
       ]);
 
       row.eachCell((cell) => {
@@ -107,6 +108,7 @@ export default function ReportsView({ tickets }) {
     worksheet.getColumn(8).width = 15; // Status
     worksheet.getColumn(9).width = 25; // Created At
     worksheet.getColumn(10).width = 25; // Resolved At
+    worksheet.getColumn(11).width = 25; // Cancelled At
 
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -191,6 +193,10 @@ export default function ReportsView({ tickets }) {
                     <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold tracking-wider ${
                       ticket.status === 'OPEN' ? 'bg-blue-100 text-blue-700' :
                       ticket.status === 'IN_PROGRESS' ? 'bg-orange-50 text-orange-600' :
+                      ticket.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                      ticket.status === 'REJECTED' || ticket.status === 'RE-OPENED' ? 'bg-red-100 text-red-700' :
+                      ticket.status === 'CLOSED' ? 'bg-slate-100 text-slate-700' :
+                      ticket.status === 'CANCELLED' ? 'bg-zinc-100 text-zinc-700' :
                       'bg-green-100 text-green-700'
                     }`}>
                       {ticket.status.replace('_', ' ')}

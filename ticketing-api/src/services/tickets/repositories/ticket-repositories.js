@@ -114,26 +114,31 @@ class TicketRepositories {
         return result.rows;
     }
 
-    async updateTicketStatus(id, status, assignee_id, resolution_notes=null, resolution_image=null) {
+    async updateTicketStatus(id, status, assignee_id, resolution_notes=null, resolution_image=null, action_reason=null) {
         let updateQueryText = `
             UPDATE tickets 
             SET status = $1, 
-                assignee_id = $2, 
+                assignee_id = COALESCE($2, assignee_id), 
                 resolution_notes = COALESCE($3, resolution_notes), 
                 resolution_image = COALESCE($4, resolution_image), 
+                action_reason = COALESCE($5, action_reason),
                 updated_at = CURRENT_TIMESTAMP`;
 
         if (status === 'IN_PROGRESS') {
             updateQueryText += `, in_progress_at = COALESCE(in_progress_at, CURRENT_TIMESTAMP)`;
         } else if (status === 'RESOLVED') {
             updateQueryText += `, resolved_at = CURRENT_TIMESTAMP`;
+        } else if (status === 'PENDING') {
+            updateQueryText += `, pending_at = CURRENT_TIMESTAMP`;
+        } else if (status === 'REJECTED') {
+            updateQueryText += `, rejected_at = CURRENT_TIMESTAMP`;
         }
 
-        updateQueryText += ` WHERE id = $5 RETURNING id`;
+        updateQueryText += ` WHERE id = $6 RETURNING id`;
 
         const updateQuery = {
             text: updateQueryText,
-            values: [status, assignee_id, resolution_notes, resolution_image, id]
+            values: [status, assignee_id, resolution_notes, resolution_image, action_reason, id]
         }
         const updateResult = await this._pool.query(updateQuery);
         
@@ -161,12 +166,13 @@ class TicketRepositories {
         return getResult.rows[0]; 
     }
 
-    async assignTicket(id, assignee_id, assigner_id, assignment_note) {
+    async assignTicket(id, assignee_id, assigner_id, assignment_note_user, assignment_note_tech) {
         let updateQueryText = `
             UPDATE tickets 
             SET assignee_id = $2, 
                 assigner_id = $3,
-                assignment_note = $4,
+                assignment_note_user = $4,
+                assignment_note_tech = $5,
                 status = 'IN_PROGRESS',
                 in_progress_at = CURRENT_TIMESTAMP,
                 updated_at = CURRENT_TIMESTAMP`;
@@ -175,7 +181,7 @@ class TicketRepositories {
 
         const updateQuery = {
             text: updateQueryText,
-            values: [id, assignee_id, assigner_id, assignment_note]
+            values: [id, assignee_id, assigner_id, assignment_note_user, assignment_note_tech]
         }
         const updateResult = await this._pool.query(updateQuery);
         
@@ -216,6 +222,28 @@ class TicketRepositories {
             throw new InvariantError('Gagal menghapus tiket, tiket tidak ditemukan');
         }
         return result.rows[0].id;
+    }
+
+    async cancelTicket(id, cancel_reason) {
+        const updateQuery = {
+            text: `
+                UPDATE tickets
+                SET status = 'CANCELLED',
+                    action_reason = $1,
+                    cancelled_at = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2
+                RETURNING id
+            `,
+            values: [cancel_reason, id]
+        };
+        const updateResult = await this._pool.query(updateQuery);
+
+        if (!updateResult.rows.length) {
+            throw new InvariantError('ticket tidak ditemukan');
+        }
+
+        return this.getTicketById(id);
     }
 
     async updateTicketFeedback(id, rating, feedback_note, status) {

@@ -50,6 +50,9 @@ const normalizeTickets = (payload) => {
       reopenedAt: isValidDate(t.reopened_at) ? t.reopened_at : null,
       resolvedAt: isValidDate(t.resolved_at) ? t.resolved_at : null,
       closedAt: isValidDate(t.closed_at) ? t.closed_at : null,
+      pendingAt: isValidDate(t.pending_at) ? t.pending_at : null,
+      rejectedAt: isValidDate(t.rejected_at) ? t.rejected_at : null,
+      cancelledAt: isValidDate(t.cancelled_at) ? t.cancelled_at : null,
       createdAt: isValidDate(t.created_at) ? t.created_at : isValidDate(t.createdAt) ? t.createdAt : null,
       updatedAt: isValidDate(t.updated_at) ? t.updated_at : isValidDate(t.updatedAt) ? t.updatedAt : null,
       due: t.due ?? 'Not set',
@@ -65,7 +68,7 @@ function EmployeeRoute({ userRole, children }) {
   return userRole === 'employee' ? children : <Navigate to="/dashboard" replace />;
 }
 
-function AppRoutes({ userRole, user, tickets, isLoading, onLogin, onCreateTicket, onStatusChange, onAssignTicket, onClaimTicket, onDeleteTicket, onLogout, handleLogout, onUpdateUser }) {
+function AppRoutes({ userRole, user, tickets, isLoading, onLogin, onCreateTicket, onStatusChange, onAssignTicket, onClaimTicket, onCancelTicket, onDeleteTicket, onLogout, handleLogout, onUpdateUser }) {
   const navigate = useNavigate();
 
   return (
@@ -84,6 +87,7 @@ function AppRoutes({ userRole, user, tickets, isLoading, onLogin, onCreateTicket
               onStatusChange={onStatusChange}
               onAssignTicket={onAssignTicket}
               onClaimTicket={onClaimTicket}
+              onCancelTicket={onCancelTicket}
               onDeleteTicket={onDeleteTicket}
               onCreateTicket={onCreateTicket}
               onLogout={onLogout}
@@ -161,10 +165,10 @@ function App() {
     return res;
   };
 
-  const handleStatusChange = async (status, ticketId, resolutionNote = null, resolutionImage = null) => {
-    if (userRole !== 'it_staff' && userRole !== 'superadmin') return;
+  const handleStatusChange = async (status, ticketId, resolutionNote = null, resolutionImage = null, actionReason = null) => {
+    if (userRole !== 'it_staff' && userRole !== 'superadmin' && userRole !== 'admin') return;
     try {
-      await ticketApi.updateStatus(ticketId, status, resolutionNote, resolutionImage);
+      await ticketApi.updateStatus(ticketId, status, resolutionNote, resolutionImage, actionReason);
       const data = await ticketApi.list();
       setTickets(normalizeTickets(data));
     } catch (error) {
@@ -173,10 +177,10 @@ function App() {
     }
   };
 
-  const handleAssignTicket = async (ticketId, assigneeId, assignmentNote) => {
+  const handleAssignTicket = async (ticketId, assigneeId, assignmentNoteUser, assignmentNoteTech) => {
     if (userRole !== 'superadmin' && userRole !== 'admin') return;
     try {
-      await ticketApi.assign(ticketId, assigneeId, assignmentNote);
+      await ticketApi.assign(ticketId, assigneeId, assignmentNoteUser, assignmentNoteTech);
       const data = await ticketApi.list();
       setTickets(normalizeTickets(data));
     } catch (error) {
@@ -185,14 +189,26 @@ function App() {
     }
   };
 
-  const handleClaimTicket = async (ticketId, assignmentNote) => {
+  const handleClaimTicket = async (ticketId, assignmentNoteUser) => {
     if (userRole !== 'it_staff') return;
     try {
-      await ticketApi.claim(ticketId, assignmentNote);
+      await ticketApi.claim(ticketId, assignmentNoteUser);
       const data = await ticketApi.list();
       setTickets(normalizeTickets(data));
     } catch (error) {
       console.error('Failed to claim ticket:', error);
+      throw error;
+    }
+  };
+
+  const handleCancelTicket = async (ticketId, cancelReason) => {
+    if (userRole !== 'employee') return;
+    try {
+      await ticketApi.cancel(ticketId, cancelReason);
+      const data = await ticketApi.list();
+      setTickets(normalizeTickets(data));
+    } catch (error) {
+      console.error('Failed to cancel ticket:', error);
       throw error;
     }
   };
@@ -248,6 +264,7 @@ function App() {
       onStatusChange={handleStatusChange}
       onAssignTicket={handleAssignTicket}
       onClaimTicket={handleClaimTicket}
+      onCancelTicket={handleCancelTicket}
       onDeleteTicket={handleDeleteTicket}
       onLogout={handleLogout}
       onUpdateUser={handleUpdateUser}

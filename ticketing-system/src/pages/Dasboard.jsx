@@ -10,12 +10,13 @@ import UserManagementView from './UserManagementView';
 import { DEPARTMENTS, CATEGORY } from '../lib/constants';
 import PriorityBadge from '../tickets/PriorityBadge';
 
-export default function Dasboard({ tickets, userRole, user, isLoading, onStatusChange, onAssignTicket, onClaimTicket, onDeleteTicket, onCreateTicket, onLogout, onUpdateUser }) {
+export default function Dasboard({ tickets, userRole, user, isLoading, onStatusChange, onAssignTicket, onClaimTicket, onCancelTicket, onDeleteTicket, onCreateTicket, onLogout, onUpdateUser }) {
   const navigate = useNavigate();
   const [selectedTicketId, setSelectedTicketId] = useState(null);
   const [selectedView, setSelectedView] = useState('overview');
   const [activeFilter, setActiveFilter] = useState(userRole === 'it_staff' ? 'IN_PROGRESS' : 'OPEN');
   const [inProgressSubFilter, setInProgressSubFilter] = useState('ALL');
+  const [closedCategoryFilter, setClosedCategoryFilter] = useState('ALL');
   const [activeDept, setActiveDept] = useState('All');
   const [isDeptOpen, setIsDeptOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState('All');
@@ -23,8 +24,10 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
   const [createError, setCreateError] = useState('');
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [employeeViewMode, setEmployeeViewMode] = useState('My Tickets');
   const [itStaffViewMode, setItStaffViewMode] = useState('My Tasks');
+  const [clearedNotificationIds, setClearedNotificationIds] = useState([]);
   const location = useLocation();
 
   useEffect(() => {
@@ -58,6 +61,80 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
     return result;
   }, [tickets, user, userRole, employeeViewMode, itStaffViewMode, activeDept, activeCategory]);
 
+  const notificationTickets = useMemo(() => {
+    let result = [];
+    if (userRole === 'superadmin' || userRole === 'admin') {
+      result = tickets.filter(t => String(t.status).toUpperCase() === 'OPEN');
+    }
+    else if (userRole === 'it_staff') {
+      result = tickets.filter(t => {
+        if (String(t.assignee_id) !== String(user?.id)) return false;
+        const status = String(t.status).toUpperCase();
+        if (status === 'IN_PROGRESS') return true;
+
+        // Beri tahu teknisi jika tiket yang ditanganinya dibatalkan pelapor (24 jam terakhir)
+        if (status === 'CANCELLED') {
+          const cancelledTime = new Date(t.cancelledAt || t.updatedAt).getTime();
+          return Date.now() - cancelledTime < 24 * 60 * 60 * 1000;
+        }
+        return false;
+      });
+    }
+    else if (userRole === 'employee') {
+      result = tickets.filter(t => {
+        if (String(t.reporter_id) !== String(user?.id)) return false;
+        
+        const status = String(t.status).toUpperCase();
+        
+        // Tampilkan notifikasi untuk tiket yang sedang aktif diproses atau butuh aksi user (RESOLVED)
+        if (['IN_PROGRESS', 'RESOLVED', 'PENDING'].includes(status)) return true;
+        
+        // Untuk tiket yang REJECTED, tampilkan sebagai notifikasi hanya jika di-reject dalam 24 jam terakhir
+        if (status === 'REJECTED') {
+          const rejectedTime = t.rejected_at ? new Date(t.rejected_at).getTime() : new Date(t.updatedAt).getTime();
+          const now = new Date().getTime();
+          const hours24 = 24 * 60 * 60 * 1000;
+          return now - rejectedTime < hours24;
+        }
+        
+        return false;
+      });
+    }
+    return result.filter(t => !clearedNotificationIds.includes(t.id));
+  }, [tickets, userRole, user?.id, clearedNotificationIds]);
+
+  const handleNotificationClick = (ticket) => {
+    setClearedNotificationIds(prev => [...prev, ticket.id]);
+    
+    // Switch active filter so the sidebar shows the correct status category
+    const status = String(ticket.status).toUpperCase();
+    if (status === 'IN_PROGRESS' || status === 'RE-OPENED') {
+      setActiveFilter('IN_PROGRESS');
+      setInProgressSubFilter(status === 'RE-OPENED' ? 'RE_OPENED' : 'IN_PROGRESS_ONLY');
+    } else if (['OPEN', 'PENDING', 'RESOLVED', 'CLOSED', 'REJECTED', 'CANCELLED'].includes(status)) {
+      setActiveFilter(status);
+    } else {
+      setActiveFilter('ALL');
+    }
+
+    handleOpenTicket(ticket.id);
+    setIsNotificationOpen(false);
+  };
+
+  const getNotificationStatusStyle = (status) => {
+    switch (String(status).toUpperCase()) {
+      case 'OPEN': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'IN_PROGRESS': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'PENDING': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'RE-OPENED': return 'bg-red-100 text-red-800 border-red-200';
+      case 'RESOLVED': return 'bg-green-100 text-green-800 border-green-200';
+      case 'REJECTED': return 'bg-red-100 text-red-800 border-red-200';
+      case 'CLOSED': return 'bg-slate-100 text-slate-800 border-slate-200';
+      case 'CANCELLED': return 'bg-zinc-100 text-zinc-600 border-zinc-300';
+      default: return 'bg-slate-100 text-slate-700 border-slate-200';
+    }
+  };
+
   const handleCreateSubmit = async (ticketData) => {
     setCreateError('');
     try {
@@ -82,10 +159,14 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
         if (inProgressSubFilter === 'IN_PROGRESS_ONLY') return ticket.status === 'IN_PROGRESS';
         return ticket.status === 'IN_PROGRESS' || ticket.status === 'RE-OPENED';
       }
-      if (activeFilter === 'CLOSED') return ticket.status === 'CLOSED';
+      if (activeFilter === 'CLOSED') {
+        if (ticket.status !== 'CLOSED') return false;
+        if (closedCategoryFilter === 'ALL') return true;
+        return String(ticket.category).toUpperCase() === closedCategoryFilter;
+      }
       return ticket.status === activeFilter;
     });
-  }, [activeFilter, inProgressSubFilter, scopedTickets]);
+  }, [activeFilter, inProgressSubFilter, closedCategoryFilter, scopedTickets]);
 
   const countTickets = (status) => {
     return scopedTickets.filter(ticket => {
@@ -123,15 +204,72 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
         </div>
 
         {/* Centered App Name */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2">
-          <abbr title="Sistem Informasi Pelaporan Elektronik dan Tiket Resolusi Operasional IT PetroChina Jabung" className="text-base font-semibold tracking-wide text-white cursor-help decoration-dashed underline underline-offset-4 decoration-white/50 hover:decoration-white transition-colors">SI-PETRO JABUNG</abbr>
+        <div className="flex flex-1 justify-center sm:flex-none sm:absolute sm:left-1/2 sm:-translate-x-1/2 px-2 overflow-hidden">
+          <abbr title="Sistem Informasi Pelaporan Elektronik dan Tiket Resolusi Operasional IT PetroChina Jabung" className="text-sm sm:text-base font-semibold tracking-wide text-white cursor-help decoration-dashed underline underline-offset-4 decoration-white/50 hover:decoration-white transition-colors truncate">SI-PETRO JABUNG</abbr>
         </div>
         
         <div className="flex items-center gap-4 relative">
+          {/* Notification Bell */}
+          <div className="relative">
+            <button 
+              className="relative p-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded-full transition-colors focus:outline-none"
+              onClick={() => {
+                setIsNotificationOpen(!isNotificationOpen);
+                setIsProfileOpen(false);
+              }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-6 h-6 ${notificationTickets.length > 0 ? 'animate-wiggle' : ''}`}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+              </svg>
+              {notificationTickets.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 block h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-[#263B56]"></span>
+              )}
+            </button>
+            
+            {isNotificationOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsNotificationOpen(false)}></div>
+                <div className="fixed top-16 right-2 sm:absolute sm:top-auto sm:right-0 sm:mt-2 w-[calc(100vw-1rem)] max-w-[320px] sm:max-w-sm sm:w-80 bg-white rounded-lg shadow-xl border border-slate-100 z-50 overflow-hidden flex flex-col max-h-[80vh] sm:max-h-96">
+                  <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="text-sm font-semibold text-slate-800">Notifications</h3>
+                    <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full">{notificationTickets.length} new</span>
+                  </div>
+                  <div className="overflow-y-auto flex-1">
+                    {notificationTickets.length > 0 ? (
+                      <div className="divide-y divide-slate-100">
+                        {notificationTickets.map(ticket => (
+                          <button
+                            key={ticket.id}
+                            className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors flex flex-col gap-1"
+                            onClick={() => handleNotificationClick(ticket)}
+                          >
+                            <div className="flex justify-between items-start">
+                              <span className="font-semibold text-sm text-slate-800">{ticket.code}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full border ${getNotificationStatusStyle(ticket.status)}`}>{ticket.status}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 line-clamp-1">{ticket.title || ticket.summary}</p>
+                            <span className="text-[10px] text-slate-400 mt-1">{new Date(ticket.createdAt).toLocaleString()}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="p-4 text-center text-sm text-slate-500">
+                        Tidak ada notifikasi baru.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Profile */}
           <div 
             className="flex items-center gap-3 cursor-pointer group"
-            onClick={() => setIsProfileOpen(!isProfileOpen)}
+            onClick={() => {
+              setIsProfileOpen(!isProfileOpen);
+              setIsNotificationOpen(false);
+            }}
           >
             <div className="flex flex-col text-right hidden sm:flex">
               <span className="text-sm font-medium text-white">{user?.fullname || 'User'}</span>
@@ -275,6 +413,42 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
                   setIsMobileMenuOpen(false);
                 }} 
                 activeColor="slate"
+              />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400">On Hold & Cancelled</p>
+            <div className="space-y-1">
+              <SidebarItem 
+                icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>}
+                label="Pending" count={countTickets('PENDING')} active={selectedView === 'dashboard' && activeFilter === 'PENDING'} 
+                onClick={() => {
+                  setActiveFilter('PENDING'); 
+                  setSelectedView('dashboard');
+                  setIsMobileMenuOpen(false);
+                }} 
+                activeColor="yellow"
+              />
+              <SidebarItem 
+                icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                label="Rejected" count={countTickets('REJECTED')} active={selectedView === 'dashboard' && activeFilter === 'REJECTED'} 
+                onClick={() => {
+                  setActiveFilter('REJECTED'); 
+                  setSelectedView('dashboard');
+                  setIsMobileMenuOpen(false);
+                }} 
+                activeColor="red"
+              />
+              <SidebarItem 
+                icon={<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>}
+                label="Cancelled" count={countTickets('CANCELLED')} active={selectedView === 'dashboard' && activeFilter === 'CANCELLED'} 
+                onClick={() => {
+                  setActiveFilter('CANCELLED'); 
+                  setSelectedView('dashboard');
+                  setIsMobileMenuOpen(false);
+                }} 
+                activeColor="zinc"
               />
             </div>
           </div>
@@ -471,7 +645,7 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
 
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#f8fafc]">
         {selectedView === 'overview' ? (
-          <div key="overview" className="flex-1 overflow-y-auto p-8">
+          <div key="overview" className="flex-1 overflow-y-auto p-4 md:p-8">
             <DashboardOverview 
               tickets={scopedTickets} 
               user={user} 
@@ -516,6 +690,26 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
                       </span>
                     )}
                   </button>
+                </div>
+              )}
+
+              {activeFilter === 'CLOSED' && (
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-start sm:self-auto w-full sm:w-auto overflow-x-auto">
+                  <button 
+                    onClick={() => setClosedCategoryFilter('ALL')}
+                    className={`whitespace-nowrap flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${closedCategoryFilter === 'ALL' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    All
+                  </button>
+                  {Object.keys(CATEGORY).map((catKey) => (
+                    <button 
+                      key={catKey}
+                      onClick={() => setClosedCategoryFilter(catKey)}
+                      className={`whitespace-nowrap flex-1 sm:flex-none px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${closedCategoryFilter === catKey ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                    >
+                      {CATEGORY[catKey].label}
+                    </button>
+                  ))}
                 </div>
               )}
             </header>
@@ -625,8 +819,8 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
               onBack={() => {
                 setSelectedView('dashboard');
               }}
-              onStatusChange={async (status, note, img) => {
-                await onStatusChange(status, selectedTicket.id, note, img);
+              onStatusChange={async (status, note, img, actionReason) => {
+                await onStatusChange(status, selectedTicket.id, note, img, actionReason);
                 if (status === 'IN_PROGRESS' || status === 'RESOLVED') {
                   setTimeout(() => {
                     setActiveFilter(status);
@@ -634,8 +828,8 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
                   }, 1500);
                 }
               }}
-              onAssignTicket={async (assigneeId, assignmentNote) => {
-                await onAssignTicket(selectedTicket.id, assigneeId, assignmentNote);
+              onAssignTicket={async (assigneeId, assignmentNoteUser, assignmentNoteTech) => {
+                await onAssignTicket(selectedTicket.id, assigneeId, assignmentNoteUser, assignmentNoteTech);
                 setTimeout(() => {
                   setActiveFilter('IN_PROGRESS');
                   setSelectedView('dashboard');
@@ -645,6 +839,13 @@ export default function Dasboard({ tickets, userRole, user, isLoading, onStatusC
                 await onClaimTicket(selectedTicket.id, assignmentNote);
                 setTimeout(() => {
                   setActiveFilter('IN_PROGRESS');
+                  setSelectedView('dashboard');
+                }, 1500);
+              }}
+              onCancelTicket={async (cancelReason) => {
+                await onCancelTicket(selectedTicket.id, cancelReason);
+                setTimeout(() => {
+                  setActiveFilter('CANCELLED');
                   setSelectedView('dashboard');
                 }, 1500);
               }}
@@ -676,6 +877,15 @@ function SidebarItem({ icon, label, count, active, onClick, activeColor = 'blue'
     },
     slate: {
       border: 'border-slate-500', bg: 'bg-slate-50', text: 'text-slate-700', icon: 'text-slate-500', badgeBg: 'bg-slate-200', badgeText: 'text-slate-700'
+    },
+    yellow: {
+      border: 'border-yellow-600', bg: 'bg-yellow-50', text: 'text-yellow-700', icon: 'text-yellow-600', badgeBg: 'bg-yellow-100', badgeText: 'text-yellow-700'
+    },
+    red: {
+      border: 'border-red-600', bg: 'bg-red-50', text: 'text-red-700', icon: 'text-red-600', badgeBg: 'bg-red-100', badgeText: 'text-red-700'
+    },
+    zinc: {
+      border: 'border-zinc-500', bg: 'bg-zinc-100', text: 'text-zinc-700', icon: 'text-zinc-600', badgeBg: 'bg-zinc-200', badgeText: 'text-zinc-700'
     }
   };
   const activeClass = colorMap[activeColor] || colorMap.blue;
@@ -711,6 +921,9 @@ function StatusDot({ status }) {
     'RE-OPENED': 'bg-red-500',
     RESOLVED: 'bg-green-600',
     CLOSED: 'bg-slate-600',
+    PENDING: 'bg-yellow-500',
+    REJECTED: 'bg-red-600',
+    CANCELLED: 'bg-zinc-400',
   };
   return <div className={`h-2.5 w-2.5 rounded-full ${colors[status] || 'bg-slate-300'}`} title={`Status: ${status}`} />;
 }

@@ -7,9 +7,16 @@ export const PRIORITY = {
 export const STATUS = {
   OPEN:        { label: 'Open',        color: 'alert' },
   IN_PROGRESS: { label: 'In Progress', color: 'caution' },
+  PENDING:     { label: 'Pending',     color: 'caution' },
+  'RE-OPENED': { label: 'Re-Opened',   color: 'alert' },
   RESOLVED:    { label: 'Resolved',    color: 'go' },
   CLOSED:      { label: 'Closed',      color: 'ink' },
+  REJECTED:    { label: 'Rejected',    color: 'alert' },
+  CANCELLED:   { label: 'Cancelled',   color: 'muted' },
 };
+
+// Status yang masih dapat dibatalkan oleh Pelapor (sesuai flowchart)
+export const CANCELLABLE_STATUSES = ['OPEN', 'IN_PROGRESS'];
 
 export const CATEGORY = {
   HARDWARE: { label: 'Hardware' },
