@@ -122,15 +122,15 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
     const { value: actionReason } = await Swal.fire({
       title: 'Reject Ticket',
       input: 'textarea',
-      inputLabel: 'Alasan penolakan (wajib diisi)',
-      inputPlaceholder: 'Masukkan alasan...',
+      inputLabel: 'Rejection reason (required)',
+      inputPlaceholder: 'Enter reason...',
       showCancelButton: true,
       confirmButtonText: 'Reject',
       confirmButtonColor: '#dc2626',
-      cancelButtonText: 'Batal',
+      cancelButtonText: 'Cancel',
       inputValidator: (value) => {
         if (!value || !value.trim()) {
-          return 'Alasan penolakan wajib diisi!';
+          return 'Rejection reason is required!';
         }
       }
     });
@@ -142,13 +142,13 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
         await onStatusChange?.('REJECTED', null, null, actionReason);
         Swal.fire({
           title: 'Rejected!',
-          text: 'Tiket berhasil ditolak.',
+          text: 'Ticket has been successfully rejected.',
           icon: 'success',
           timer: 2000,
           showConfirmButton: false
         });
       } catch (error) {
-        setStatusError(error.response?.data?.message || error.message || 'Gagal menolak tiket.');
+        setStatusError(error.response?.data?.message || error.message || 'Failed to reject ticket.');
       } finally {
         setStatusRequest(null);
       }
@@ -159,15 +159,15 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
     const { value: actionReason } = await Swal.fire({
       title: 'Pending Ticket',
       input: 'textarea',
-      inputLabel: 'Alasan penundaan (wajib diisi)',
-      inputPlaceholder: 'Masukkan alasan...',
+      inputLabel: 'Pending reason (required)',
+      inputPlaceholder: 'Enter reason...',
       showCancelButton: true,
       confirmButtonText: 'Pending',
       confirmButtonColor: '#ea580c',
-      cancelButtonText: 'Batal',
+      cancelButtonText: 'Cancel',
       inputValidator: (value) => {
         if (!value || !value.trim()) {
-          return 'Alasan penundaan wajib diisi!';
+          return 'Pending reason is required!';
         }
       }
     });
@@ -179,13 +179,13 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
         await onStatusChange?.('PENDING', null, null, actionReason);
         Swal.fire({
           title: 'Pending!',
-          text: 'Tiket berhasil ditunda.',
+          text: 'Ticket has been put on pending.',
           icon: 'success',
           timer: 2000,
           showConfirmButton: false
         });
       } catch (error) {
-        setStatusError(error.response?.data?.message || error.message || 'Gagal menunda tiket.');
+        setStatusError(error.response?.data?.message || error.message || 'Failed to put ticket on pending.');
       } finally {
         setStatusRequest(null);
       }
@@ -298,19 +298,19 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
     if (!selectedTech) return;
     
     const { value: notes } = await Swal.fire({
-      title: 'Catatan Penugasan',
+      title: 'Assignment Notes',
       html: `
         <div class="text-left w-full mt-2">
-          <label class="text-sm font-medium text-slate-600 block mb-1">Catatan untuk Pelapor (User)</label>
-          <textarea id="swal-input1" class="text-sm text-slate-700 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full min-h-[100px] p-3 mb-4" placeholder="Masukkan catatan untuk user..."></textarea>
+          <label class="text-sm font-medium text-slate-600 block mb-1">Note for Reporter (User)</label>
+          <textarea id="swal-input1" class="text-sm text-slate-700 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full min-h-[100px] p-3 mb-4" placeholder="Enter instructions or notes for the reporter..."></textarea>
           
-          <label class="text-sm font-medium text-slate-600 block mb-1">Catatan untuk Teknisi</label>
-          <textarea id="swal-input2" class="text-sm text-slate-700 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full min-h-[100px] p-3" placeholder="Masukkan instruksi teknis untuk teknisi..."></textarea>
+          <label class="text-sm font-medium text-slate-600 block mb-1">Technician Instructions</label>
+          <textarea id="swal-input2" class="text-sm text-slate-700 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full min-h-[100px] p-3" placeholder="Enter technical instructions for the technician..."></textarea>
         </div>
       `,
       showCancelButton: true,
-      confirmButtonText: 'Tugaskan',
-      cancelButtonText: 'Batal',
+      confirmButtonText: 'Assign',
+      cancelButtonText: 'Cancel',
       customClass: {
         popup: 'rounded-xl shadow-2xl border border-slate-200 w-[500px]',
         title: 'text-xl font-bold text-slate-800',
@@ -323,7 +323,7 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
         const noteUser = document.getElementById('swal-input1').value;
         const noteTech = document.getElementById('swal-input2').value;
         if (!noteUser || !noteTech) {
-          Swal.showValidationMessage('Kedua catatan wajib diisi!');
+          Swal.showValidationMessage('Both notes are required!');
           return false;
         }
         return { noteUser, noteTech };
@@ -515,10 +515,10 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
             </div>
           )}
 
-          {ticket.assignment_note_user && (userRole === 'employee' || userRole === 'superadmin' || userRole === 'admin') && (
+          {ticket.assignment_note_user && (
             <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm mt-2">
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-indigo-800">
-                Catatan Penugasan (User)
+                Assignment Note (to Reporter)
               </h3>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-indigo-900 font-medium">
                 {ticket.assignment_note_user}
@@ -529,7 +529,7 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
           {ticket.assignment_note_tech && (userRole === 'it_staff' || userRole === 'superadmin' || userRole === 'admin') && (
             <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-6 shadow-sm mt-2">
               <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-indigo-800">
-                Instruksi Teknisi
+                Technician Instructions
               </h3>
               <p className="whitespace-pre-wrap text-sm leading-relaxed text-indigo-900 font-medium">
                 {ticket.assignment_note_tech}
@@ -625,16 +625,21 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
                   type="button"
                   onClick={async () => {
                     const { value: assignmentNote } = await Swal.fire({
-                      title: 'Catatan Penugasan',
+                      title: 'Claim Ticket',
                       input: 'textarea',
-                      inputLabel: 'Masukkan catatan/instruksi tambahan (opsional)',
-                      inputPlaceholder: 'Tulis catatan di sini...',
+                      inputLabel: 'Note for reporter (required)',
+                      inputPlaceholder: 'Enter note or action planned for reporter...',
                       showCancelButton: true,
-                      confirmButtonText: 'Klaim',
-                      cancelButtonText: 'Batal'
+                      confirmButtonText: 'Claim',
+                      cancelButtonText: 'Cancel',
+                      inputValidator: (value) => {
+                        if (!value || !value.trim()) {
+                          return 'Note for reporter is required to claim this ticket!';
+                        }
+                      }
                     });
 
-                    if (assignmentNote !== undefined) {
+                    if (assignmentNote) {
                       setStatusRequest('IN_PROGRESS');
                       try {
                         await onClaimTicket?.(assignmentNote);
@@ -647,12 +652,12 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
                   disabled={statusRequest !== null}
                   className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
                 >
-                  {statusRequest === 'IN_PROGRESS' ? 'Processing...' : 'Klaim Tiket'}
+                  {statusRequest === 'IN_PROGRESS' ? 'Processing...' : 'Claim Ticket'}
                 </button>
               ) : (
                 <div className="rounded-md border border-orange-200 bg-orange-50 p-4 text-center">
                   <p className="text-sm font-medium text-orange-800">
-                    Tiket ini di luar batas spesialisasi keahlian Anda.
+                    This ticket is outside your specialization area.
                   </p>
                 </div>
               )
@@ -661,7 +666,7 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
             {userRole === 'it_staff' && safeStatus === 'IN_PROGRESS' && !isMyTask && (
               <div className="rounded-md border border-blue-200 bg-blue-50 p-4 text-center">
                 <p className="text-sm font-medium text-blue-800">
-                  Tiket ini sedang ditangani oleh teknisi terkait: <span className="font-bold">{ticket.assignee ? `${ticket.assignee}${ticket.assignee_specialization ? ` (${ticket.assignee_specialization})` : ''}` : 'Teknisi'}</span>
+                  This ticket is currently being handled by: <span className="font-bold">{ticket.assignee ? `${ticket.assignee}${ticket.assignee_specialization ? ` (${ticket.assignee_specialization})` : ''}` : 'Technician'}</span>
                 </p>
               </div>
             )}
@@ -702,7 +707,7 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
                   disabled={statusRequest !== null}
                   className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
-                  {statusRequest === 'IN_PROGRESS' ? 'Processing...' : 'Lanjutkan (Resume to In Progress)'}
+                  {statusRequest === 'IN_PROGRESS' ? 'Processing...' : 'Resume to In Progress'}
                 </button>
               </div>
             )}
@@ -946,7 +951,7 @@ export default function TicketDetail({ ticket, onBack, onStatusChange, onAssignT
                 </h4>
                 {(safeStatus === 'IN_PROGRESS' || safeStatus === 'RE-OPENED') && (
                   <p className="text-xs font-medium text-slate-500 mb-2">
-                    Saat ini ditangani oleh: <span className="font-bold text-slate-700">{ticket.assignee ? `${ticket.assignee}${ticket.assignee_specialization ? ` (${ticket.assignee_specialization})` : ''}` : 'Teknisi'}</span>
+                    Currently handled by: <span className="font-bold text-slate-700">{ticket.assignee ? `${ticket.assignee}${ticket.assignee_specialization ? ` (${ticket.assignee_specialization})` : ''}` : 'Technician'}</span>
                   </p>
                 )}
                 <div className="flex items-center gap-3">
