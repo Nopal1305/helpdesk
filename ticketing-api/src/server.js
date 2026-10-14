@@ -1,9 +1,8 @@
 import 'dotenv/config';
 import server from './server/server.js';
 
-const host = process.env.DB_HOST;
-const port = process.env.PORT;
+const port = process.env.PORT || 5000;
 
 server.listen(port, () => {
-    console.log(`server running at http://${host}:${port}`);
-})
+    console.log(`Server running on port ${port}`);
+});
